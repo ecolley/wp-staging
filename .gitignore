@@ -1,0 +1,32 @@
+# Environment files with secrets
+.env
+
+# Data directories (should be created by setup, not committed)
+.srv/
+
+# Logs
+*.log
+
+# Docker
+docker-compose.override.yml
+
+# OS files
+.DS_Store
+Thumbs.db
+._*
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Backup files
+*.bak
+*.backup
+
+# Temporary files
+tmp/
+temp/
+*.tmp

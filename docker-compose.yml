@@ -1,0 +1,163 @@
+
+services:
+  wordpress:
+    image: wordpress:latest
+    container_name: ${INSTANCE}-wordpress
+    depends_on:
+      - db
+    links:
+      - db
+    ports:
+      - ${WP_PORT}:80
+    restart: always
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+      WORDPRESS_DEBUG: 0
+      WORDPRESS_TABLE_PREFIX: wp_
+      WORDPRESS_CONFIG_EXTRA: |
+        define('FS_METHOD', 'direct');
+        define('SCRIPT_DEBUG', false);
+    volumes:
+      - /home/${INSTANCE}/.srv/wordpress/:/var/www/html
+      - /home/${INSTANCE}/.srv/log/:/var/log
+      - /home/${INSTANCE}/custom.ini:/usr/local/etc/php/conf.d/custom.ini
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: ${INSTANCE}-pma
+    links:
+      - db
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    restart: always
+    ports:
+      - ${PMA_ACCESS_PORT}:80
+
+
+  wpcli:
+    depends_on:
+      - db
+      - wordpress
+    image: wordpress:cli
+    container_name: ${INSTANCE}-wpcli
+    links:
+      - db:db
+#    entrypoint: wp
+#    command: "--info"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+      WORDPRESS_DEBUG: 0
+      WORDPRESS_TABLE_PREFIX: wp_
+      WORDPRESS_CONFIG_EXTRA: |
+        define('FS_METHOD', 'direct');
+    volumes:
+      - /home/${INSTANCE}/.srv/wordpress/:/var/www/html
+      - /home/${INSTANCE}/.srv/log/:/var/log
+      - /home/${INSTANCE}/custom.ini:/usr/local/etc/php/conf.d/custom.ini
+
+  db:
+    image: mysql:5.7
+    container_name: ${INSTANCE}-db
+    restart: always
+    ports:
+      - '${DB_PORT}:3306'
+    volumes:
+      - "/home/${INSTANCE}/.srv/database:/var/lib/mysql"
+      - "/home/${INSTANCE}/.srv/log/mysql:/var/log/mysql"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${WORDPRESS_DB_NAME}
+      MYSQL_USER: ${WORDPRESS_DB_USER}
+      MYSQL_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+    command: mysqld --general-log=1 --general-log-file=/var/log/mysql/general-log.log
+
+  # ============================================
+  # STAGING ENVIRONMENT
+  # ============================================
+  # Staging services mirror production services with separate data and ports
+
+  staging-wordpress:
+    image: wordpress:latest
+    container_name: ${INSTANCE}-staging-wordpress
+    depends_on:
+      - staging-db
+    links:
+      - staging-db:db
+    ports:
+      - ${STAGING_WP_PORT}:80
+    restart: always
+    environment:
+      WORDPRESS_DB_HOST: staging-db:3306
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+      WORDPRESS_DEBUG: 0
+      WORDPRESS_TABLE_PREFIX: wp_
+      WORDPRESS_CONFIG_EXTRA: |
+        define('FS_METHOD', 'direct');
+        define('SCRIPT_DEBUG', false);
+    volumes:
+      - /home/${INSTANCE}/.srv/staging/wordpress/:/var/www/html
+      - /home/${INSTANCE}/.srv/staging/log/:/var/log
+      - /home/${INSTANCE}/custom.ini:/usr/local/etc/php/conf.d/custom.ini
+
+  staging-db:
+    image: mysql:5.7
+    container_name: ${INSTANCE}-staging-db
+    restart: always
+    ports:
+      - ${STAGING_DB_PORT}:3306
+    volumes:
+      - /home/${INSTANCE}/.srv/staging/database:/var/lib/mysql
+      - /home/${INSTANCE}/.srv/staging/log/mysql:/var/log/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${WORDPRESS_DB_NAME}
+      MYSQL_USER: ${WORDPRESS_DB_USER}
+      MYSQL_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+    command: mysqld --general-log=1 --general-log-file=/var/log/mysql/general-log.log
+
+  staging-phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: ${INSTANCE}-staging-pma
+    links:
+      - staging-db:db
+    environment:
+      PMA_HOST: staging-db
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    restart: always
+    ports:
+      - ${STAGING_PMA_ACCESS_PORT}:80
+
+  staging-wpcli:
+    depends_on:
+      - staging-db
+      - staging-wordpress
+    image: wordpress:cli
+    container_name: ${INSTANCE}-staging-wpcli
+    links:
+      - staging-db:db
+    environment:
+      WORDPRESS_DB_HOST: staging-db:3306
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+      WORDPRESS_DEBUG: 0
+      WORDPRESS_TABLE_PREFIX: wp_
+      WORDPRESS_CONFIG_EXTRA: |
+        define('FS_METHOD', 'direct');
+    volumes:
+      - /home/${INSTANCE}/.srv/staging/wordpress/:/var/www/html
+      - /home/${INSTANCE}/.srv/staging/log/:/var/log
+      - /home/${INSTANCE}/custom.ini:/usr/local/etc/php/conf.d/custom.ini
