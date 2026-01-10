@@ -1,0 +1,21 @@
+# Enforce Unix line endings for shell scripts
+*.sh text eol=lf
+
+# Ensure all text files use LF
+* text=auto eol=lf
+
+# Explicitly define text files
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.ini text eol=lf
+*.conf text eol=lf
+*.txt text eol=lf
+
+# Define binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
