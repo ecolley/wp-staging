@@ -106,7 +106,7 @@ echo "Checking backup retention policy..."
 
 # Remove backups older than BACKUP_RETENTION_DAYS
 if [ ! -z "$BACKUP_RETENTION_DAYS" ] && [ "$BACKUP_RETENTION_DAYS" -gt 0 ]; then
-    OLD_BACKUPS=$(find /home/${INSTANCE}/.srv/backups/ -maxdepth 1 -type d -mtime +${BACKUP_RETENTION_DAYS} | grep -v "^/home/${INSTANCE}/.srv/backups/$")
+    OLD_BACKUPS=$(find /home/${INSTANCE}/.srv/backups/ -maxdepth 1 -type d -mtime +${BACKUP_RETENTION_DAYS} | grep -v "^/home/${INSTANCE}/.srv/backups/$" || true)
     if [ ! -z "$OLD_BACKUPS" ]; then
         echo "Removing backups older than ${BACKUP_RETENTION_DAYS} days:"
         echo "$OLD_BACKUPS" | while read backup; do
@@ -118,14 +118,14 @@ fi
 
 # Remove excess backups if MAX_BACKUPS is set
 if [ ! -z "$MAX_BACKUPS" ] && [ "$MAX_BACKUPS" -gt 0 ]; then
-    BACKUP_COUNT=$(find /home/${INSTANCE}/.srv/backups/ -maxdepth 1 -type d | grep -v "^/home/${INSTANCE}/.srv/backups/$" | wc -l)
+    BACKUP_COUNT=$(find /home/${INSTANCE}/.srv/backups/ -maxdepth 1 -type d | grep -v "^/home/${INSTANCE}/.srv/backups/$" | wc -l || echo "0")
     if [ "$BACKUP_COUNT" -gt "$MAX_BACKUPS" ]; then
         EXCESS=$((BACKUP_COUNT - MAX_BACKUPS))
         echo "Removing ${EXCESS} oldest backups (keeping ${MAX_BACKUPS} total):"
         find /home/${INSTANCE}/.srv/backups/ -maxdepth 1 -type d | grep -v "^/home/${INSTANCE}/.srv/backups/$" | sort | head -n $EXCESS | while read backup; do
             echo "  - $(basename $backup)"
             rm -rf "$backup"
-        done
+        done || true
     fi
 fi
 
@@ -140,8 +140,10 @@ echo "  Location: ${BACKUP_DIR}"
 echo "  Size: $(du -sh ${BACKUP_DIR} | cut -f1)"
 echo ""
 echo "Available Backups:"
-ls -lh /home/${INSTANCE}/.srv/backups/ | grep "^d" | awk '{print "  " $9 " (" $5 ")"}'
+ls -lh /home/${INSTANCE}/.srv/backups/ | grep "^d" | awk '{print "  " $9 " (" $5 ")"}' || echo "  ${TIMESTAMP}"
 echo ""
 echo "To restore this backup, run:"
 echo "  ./rollback-production.sh ${TIMESTAMP}"
 echo ""
+
+exit 0
