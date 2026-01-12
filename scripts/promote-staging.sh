@@ -144,14 +144,41 @@ docker compose start wordpress wpcli phpmyadmin
 sleep 5
 
 # Update URLs in production
-docker compose run --rm wpcli wp search-replace \
+echo "Updating WordPress URLs from ${STAGING_URL} to ${PROD_URL}..."
+
+# Try wp-cli first
+if docker compose run --rm wpcli wp search-replace \
     "${STAGING_URL}" \
     "${PROD_URL}" \
     --all-tables \
-    --report-changed-only || true
+    --report-changed-only 2>/dev/null; then
+    echo -e "${GREEN}URLs updated via wp-cli${NC}"
+else
+    echo -e "${YELLOW}wp-cli failed, using direct database update...${NC}"
+    # Fallback to direct MySQL UPDATE commands
+    docker exec ${INSTANCE}-db mysql -u root -p${MYSQL_ROOT_PASSWORD} ${WORDPRESS_DB_NAME} -e "
+        UPDATE wp_options SET option_value = '${PROD_URL}' WHERE option_name IN ('siteurl', 'home');
+        UPDATE wp_posts SET post_content = REPLACE(post_content, '${STAGING_URL}', '${PROD_URL}');
+        UPDATE wp_posts SET guid = REPLACE(guid, '${STAGING_URL}', '${PROD_URL}');
+        UPDATE wp_postmeta SET meta_value = REPLACE(meta_value, '${STAGING_URL}', '${PROD_URL}');
+    " 2>&1 | grep -v "Warning"
+    echo -e "${GREEN}URLs updated via direct database commands${NC}"
+fi
+
+# Verify the URLs were actually updated
+CURRENT_URL=$(docker exec ${INSTANCE}-db mysql -u root -p${MYSQL_ROOT_PASSWORD} ${WORDPRESS_DB_NAME} -se "SELECT option_value FROM wp_options WHERE option_name = 'siteurl';" 2>/dev/null | grep -v "Warning")
+if [ "$CURRENT_URL" = "${PROD_URL}" ]; then
+    echo -e "${GREEN}URL update verified successfully${NC}"
+else
+    echo -e "${RED}ERROR: URL update failed! Current URL: ${CURRENT_URL}${NC}"
+    echo "Attempting automatic rollback..."
+    ./rollback-production.sh "${LATEST_BACKUP}"
+    exit 1
+fi
 
 # Re-enable search engine indexing
-docker compose run --rm wpcli wp option update blog_public 1 2>/dev/null || true
+docker compose run --rm wpcli wp option update blog_public 1 2>/dev/null || \
+    docker exec ${INSTANCE}-db mysql -u root -p${MYSQL_ROOT_PASSWORD} ${WORDPRESS_DB_NAME} -e "UPDATE wp_options SET option_value = '1' WHERE option_name = 'blog_public';" 2>&1 | grep -v "Warning"
 
 echo ""
 echo "Verifying production..."
